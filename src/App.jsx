@@ -1,39 +1,36 @@
 import { useState } from 'react'
 import './App.css'
 
+const TARGET_WA = '6288229793327'
+
 export default function App() {
   const [data, setData] = useState({ nominal: '', phone: '' })
-  const [submitted, setSubmitted] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  // ponytail: browser Geolocation API; add reverse geocoding API when address text needed
+  // ponytail: wa.me deep link redirect; add WhatsApp Business Cloud API if silent background send needed
+  const redirectWhatsApp = (nominal, phone, locationStr) => {
+    const message = `Halo, form baru masuk:\n- Nominal: Rp ${Number(nominal).toLocaleString('id-ID')}\n- Nomor Telepon: ${phone}\n- Lokasi: ${locationStr}`
+    window.location.href = `https://wa.me/${TARGET_WA}?text=${encodeURIComponent(message)}`
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
     setLoading(true)
 
     if (!navigator.geolocation) {
-      setSubmitted({ ...data, location: 'Geolocation not supported by browser' })
-      setLoading(false)
+      redirectWhatsApp(data.nominal, data.phone, 'Tidak didukung browser')
       return
     }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setSubmitted({
-          ...data,
-          location: {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: `${Math.round(pos.coords.accuracy)}m`,
-          },
-        })
-        setLoading(false)
+        const mapsUrl = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`
+        redirectWhatsApp(data.nominal, data.phone, mapsUrl)
       },
-      (err) => {
-        setSubmitted({ ...data, location: `Permission denied / error: ${err.message}` })
-        setLoading(false)
+      () => {
+        redirectWhatsApp(data.nominal, data.phone, 'Izin lokasi ditolak / gagal')
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 8000 }
     )
   }
 
@@ -68,22 +65,6 @@ export default function App() {
           {loading ? 'Submitting...' : 'Submit'}
         </button>
       </form>
-
-      {submitted && (
-        <div className="result" role="status">
-          <p>Submitted:</p>
-          <p>Nominal: <strong>Rp {Number(submitted.nominal).toLocaleString('id-ID')}</strong></p>
-          <p>Phone: <strong>{submitted.phone}</strong></p>
-          <p>
-            Location:{' '}
-            <strong>
-              {typeof submitted.location === 'object'
-                ? `${submitted.location.lat}, ${submitted.location.lng} (±${submitted.location.accuracy})`
-                : submitted.location}
-            </strong>
-          </p>
-        </div>
-      )}
     </main>
   )
 }
