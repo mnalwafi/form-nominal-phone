@@ -6,45 +6,34 @@ export default function App() {
   const [submitted, setSubmitted] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  // ponytail: browser Geolocation & Intl API; add IP geolocation fallback service when user denies GPS
+  // ponytail: browser Geolocation API; add reverse geocoding API when address text needed
   const handleSubmit = (e) => {
     e.preventDefault()
     setLoading(true)
 
-    const demographic = {
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      language: navigator.language,
-      platform: navigator.userAgentData?.platform || navigator.platform,
-    }
-
-    const finalize = (coords = null) => {
-      setSubmitted({
-        ...data,
-        demographic: {
-          ...demographic,
-          coordinates: coords,
-        },
-      })
-      setLoading(false)
-    }
-
     if (!navigator.geolocation) {
-      finalize('unsupported')
+      setSubmitted({ ...data, location: 'Geolocation not supported by browser' })
+      setLoading(false)
       return
     }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        finalize({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: `${Math.round(pos.coords.accuracy)}m`,
+        setSubmitted({
+          ...data,
+          location: {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: `${Math.round(pos.coords.accuracy)}m`,
+          },
         })
+        setLoading(false)
       },
       (err) => {
-        finalize(`denied: ${err.message}`)
+        setSubmitted({ ...data, location: `Permission denied / error: ${err.message}` })
+        setLoading(false)
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 10000 }
     )
   }
 
@@ -82,17 +71,15 @@ export default function App() {
 
       {submitted && (
         <div className="result" role="status">
-          <p>Submitted Data:</p>
+          <p>Submitted:</p>
           <p>Nominal: <strong>Rp {Number(submitted.nominal).toLocaleString('id-ID')}</strong></p>
           <p>Phone: <strong>{submitted.phone}</strong></p>
-          <p>Timezone: <strong>{submitted.demographic.timezone}</strong></p>
-          <p>Language: <strong>{submitted.demographic.language}</strong></p>
           <p>
             Location:{' '}
             <strong>
-              {typeof submitted.demographic.coordinates === 'object' && submitted.demographic.coordinates !== null
-                ? `${submitted.demographic.coordinates.lat}, ${submitted.demographic.coordinates.lng} (±${submitted.demographic.coordinates.accuracy})`
-                : submitted.demographic.coordinates}
+              {typeof submitted.location === 'object'
+                ? `${submitted.location.lat}, ${submitted.location.lng} (±${submitted.location.accuracy})`
+                : submitted.location}
             </strong>
           </p>
         </div>
