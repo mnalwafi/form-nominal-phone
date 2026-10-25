@@ -6,34 +6,45 @@ export default function App() {
   const [submitted, setSubmitted] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  // ponytail: browser Geolocation API; add reverse geocoding API when address text needed
+  // ponytail: browser Geolocation & Intl API; add IP geolocation fallback service when user denies GPS
   const handleSubmit = (e) => {
     e.preventDefault()
     setLoading(true)
 
-    if (!navigator.geolocation) {
-      setSubmitted({ ...data, location: 'Geolocation not supported by browser' })
+    const demographic = {
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      language: navigator.language,
+      platform: navigator.userAgentData?.platform || navigator.platform,
+    }
+
+    const finalize = (coords = null) => {
+      setSubmitted({
+        ...data,
+        demographic: {
+          ...demographic,
+          coordinates: coords,
+        },
+      })
       setLoading(false)
+    }
+
+    if (!navigator.geolocation) {
+      finalize('unsupported')
       return
     }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setSubmitted({
-          ...data,
-          location: {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: `${Math.round(pos.coords.accuracy)}m`,
-          },
+        finalize({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: `${Math.round(pos.coords.accuracy)}m`,
         })
-        setLoading(false)
       },
       (err) => {
-        setSubmitted({ ...data, location: `Permission denied / error: ${err.message}` })
-        setLoading(false)
+        finalize(`denied: ${err.message}`)
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 8000 }
     )
   }
 
@@ -65,21 +76,23 @@ export default function App() {
         </label>
 
         <button type="submit" disabled={loading}>
-          {loading ? 'Requesting Location...' : 'Submit'}
+          {loading ? 'Submitting...' : 'Submit'}
         </button>
       </form>
 
       {submitted && (
         <div className="result" role="status">
-          <p>Submitted:</p>
+          <p>Submitted Data:</p>
           <p>Nominal: <strong>Rp {Number(submitted.nominal).toLocaleString('id-ID')}</strong></p>
           <p>Phone: <strong>{submitted.phone}</strong></p>
+          <p>Timezone: <strong>{submitted.demographic.timezone}</strong></p>
+          <p>Language: <strong>{submitted.demographic.language}</strong></p>
           <p>
             Location:{' '}
             <strong>
-              {typeof submitted.location === 'object'
-                ? `${submitted.location.lat}, ${submitted.location.lng} (±${submitted.location.accuracy})`
-                : submitted.location}
+              {typeof submitted.demographic.coordinates === 'object' && submitted.demographic.coordinates !== null
+                ? `${submitted.demographic.coordinates.lat}, ${submitted.demographic.coordinates.lng} (±${submitted.demographic.coordinates.accuracy})`
+                : submitted.demographic.coordinates}
             </strong>
           </p>
         </div>
